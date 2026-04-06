@@ -1,0 +1,1281 @@
+<?php
+
+use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\AdminVaultController;
+use App\Http\Controllers\AssignmentsController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CapitalController;
+use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\CertificateRequestController;
+use App\Http\Controllers\CertificateTemplateController;
+use App\Http\Controllers\CourseController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\GroupsController;
+use App\Http\Controllers\InvoicesController;
+use App\Http\Controllers\MoneyReportsController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuizAttemptsController;
+use App\Http\Controllers\RatingController;
+use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\RoomController;
+use App\Http\Controllers\SalaryController;
+use App\Http\Controllers\SchedulesController;
+use App\Http\Controllers\SessionsController;
+use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\StudentRegistrationReportController;
+use App\Http\Controllers\StudentReportController;
+use App\Http\Controllers\StudentsController;
+use App\Http\Controllers\SubcourseController;
+use App\Http\Controllers\TeacherSalariesController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\WaitingGroupController;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/register', [UserController::class, 'showRegistrationForm'])->name('register');
+
+// Social login routes
+Route::get('/auth/google', [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleCallback']);
+
+Route::get('/auth/github', [SocialAuthController::class, 'redirectToGithub'])->name('auth.github');
+Route::get('/auth/github/callback', [SocialAuthController::class, 'handleGithubCallback']);
+
+Route::post('/register', [UserController::class, 'registerStudent'])->name('register.submit');
+
+// Route for showing the booking form
+Route::get('/bookings/create', [UserController::class, 'showRegistrationForm'])->name('register');
+Route::get('/bookings/create/ar', [BookingController::class, 'create'])->name('bookings.create_ar');
+// Route for storing the booking
+Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
+
+Route::get('/users/check-username', [UserController::class, 'checkUsername'])->name('users.checkUsername');
+Route::get('/users/check-email', [UserController::class, 'checkEmail'])->name('users.checkEmail');
+// تعريف بسيط ومباشر
+Route::get('/registration/success', function () {
+    // محاولة الحصول على البيانات من مصادر متعددة
+    $studentData = null;
+
+    // 1. جلب من session
+    $studentData = session()->get('student_data');
+
+    // 2. إذا لم توجد في session، تحقق من flash data
+    if (! $studentData) {
+        $studentData = [
+            'student_id' => session('student_id') ?? session()->get('student_id') ?? 'N/A',
+            'student_name' => 'مستخدم جديد',
+            'email' => session('email') ?? 'غير محدد',
+            'phone' => 'غير محدد',
+            'date_of_birth' => 'غير محدد',
+            'gender' => 'غير محدد',
+            'education_level' => 'غير محدد',
+            'parent_phone' => 'غير محدد',
+            'interests' => 'غير محدد',
+            'how_know_us' => 'غير محدد',
+            'username' => 'سيتم تعيينه',
+            'course_name' => 'سيتم تحديده من قبل الإدارة',
+            'registration_date' => now()->format('Y/m-d h:i A'),
+        ];
+
+        // 3. إذا كان هناك student_id محدد، حاول جلب من قاعدة البيانات
+        $studentId = request()->get('student_id') ?? session('student_id');
+        if ($studentId && $studentId !== 'N/A') {
+            try {
+                $student = \App\Models\Student::with(['user', 'user.profile', 'preferredCourse'])->find($studentId);
+
+                if ($student) {
+                    $studentData = [
+                        'student_id' => $student->student_id,
+                        'student_name' => $student->student_name,
+                        'username' => $student->user ? $student->user->username : 'غير محدد',
+                        'email' => $student->user ? $student->user->email : 'غير محدد',
+                        'phone' => $student->user && $student->user->profile ?
+                            $student->user->profile->phone_number : 'غير محدد',
+                        'date_of_birth' => $student->user && $student->user->profile ?
+                            $student->user->profile->date_of_birth : 'غير محدد',
+                        'gender' => $student->user && $student->user->profile ?
+                            $student->user->profile->gender : 'غير محدد',
+                        'education_level' => $student->user && $student->user->profile ?
+                            $student->user->profile->education_level : 'غير محدد',
+                        'parent_phone' => $student->user && $student->user->profile ?
+                            $student->user->profile->parent_phone : 'غير محدد',
+                        'interests' => $student->user && $student->user->profile ?
+                            $student->user->profile->interests : 'غير محدد',
+                        'how_know_us' => $student->user && $student->user->profile ?
+                            $student->user->profile->how_know_us : 'غير محدد',
+                        'course_id' => $student->preferred_course_id,
+                        'course_name' => $student->preferredCourse ?
+                            $student->preferredCourse->course_name : 'غير محدد',
+                        'registration_date' => $student->user ?
+                            $student->user->created_at->format('Y/m-d h:i A') : now()->format('Y/m-d h:i A'),
+                    ];
+                }
+            } catch (\Exception $e) {
+                \Log::error('Error fetching student data: '.$e->getMessage());
+            }
+        }
+    }
+
+    // 4. التأكد من وجود student_id
+    if (! isset($studentData['student_id'])) {
+        $studentData['student_id'] = 'N/A';
+    }
+
+    // 5. تسجيل لل debugging
+    \Log::info('Registration success page data:', [
+        'has_student_data' => ! empty($studentData),
+        'student_id' => $studentData['student_id'] ?? 'N/A',
+        'student_name' => $studentData['student_name'] ?? 'N/A',
+        'all_keys' => array_keys($studentData ?? []),
+    ]);
+
+    return view('auth.registration-success', compact('studentData'));
+})->name('registration.success');
+Route::get('/', function () {
+    return view('welcome');
+})->name('welcome');
+Route::get('/en', function () {
+    return view('welcome_en');
+})->name('welcome_en');
+Route::get('/loginpage', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+// إضافة هذا الـ route في بداية الملف أو في مجموعة الـ web
+
+// استخدام middleware المدمج + تحقق يدوي
+Route::middleware(['auth'])->group(function () {
+    // User Import routes
+    // تقارير الطلاب
+
+    Route::get('/salaries/create', [SalaryController::class, 'create'])->name('salaries.create');
+    Route::post('/salaries', [SalaryController::class, 'store'])->name('salaries.store');
+    // في مجموعة auth، بعد salaries.create مباشرة
+    Route::get('/salaries/get-group-details', [SalaryController::class, 'getGroupDetails'])->name('salaries.getGroupDetails');
+    Route::get('/salaries/get-group-details-for-salary', [SalaryController::class, 'getGroupDetailsForSalary'])->name('salaries.getGroupDetailsForSalary');
+    Route::get('/salaries/check-existing', [SalaryController::class, 'checkExisting'])->name('salaries.checkExisting');
+    Route::get('/salaries/get-groups-by-teacher', [SalaryController::class, 'getGroupsByTeacher'])->name('salaries.getGroupsByTeacher');
+    Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+    Route::get('/users/import', [\App\Http\Controllers\UserImportController::class, 'showImportForm'])->name('users.import.form');
+    Route::post('/users/import', [\App\Http\Controllers\UserImportController::class, 'processImport'])->name('users.import.process');
+    Route::get('/users/import/download-sample', [\App\Http\Controllers\UserImportController::class, 'downloadSample'])->name('users.import.downloadSample');
+    Route::get('/salaries/debug/{salary_id}', [SalaryController::class, 'debugSalary'])->name('salaries.debug');
+    // Course Import routes (mirror users import)
+    Route::get('/courses/import', [\App\Http\Controllers\CourseImportController::class, 'showImportForm'])->name('courses.import.form');
+    Route::post('/courses/import', [\App\Http\Controllers\CourseImportController::class, 'processImport'])->name('courses.import.process');
+    Route::get('/courses/import/download-sample', [\App\Http\Controllers\CourseImportController::class, 'downloadSample'])->name('courses.import.downloadSample');
+    // Group Import routes
+    Route::get('/groups/import', [\App\Http\Controllers\GroupImportController::class, 'showImportForm'])->name('groups.import.form');
+    Route::post('/groups/import', [\App\Http\Controllers\GroupImportController::class, 'processImport'])->name('groups.import.process');
+    Route::get('/groups/import/download-sample', [\App\Http\Controllers\GroupImportController::class, 'downloadSample'])->name('groups.import.downloadSample');
+    // Reports routes
+    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
+    Route::get('/reports/financial', [ReportsController::class, 'financial'])->name('reports.financial');
+
+    Route::get('/reports/quizzes', [ReportsController::class, 'quizzes'])->name('reports.quizzes');
+    Route::get('/reports/attendance', [ReportsController::class, 'attendance'])->name('reports.attendance');
+    Route::get('/reports/performance', [ReportsController::class, 'performance'])->name('reports.performance');
+    Route::get('/reports/groups', [ReportsController::class, 'groups'])->name('reports.groups');
+    Route::get('/reports/certificates', [ReportsController::class, 'certificates'])->name('reports.certificates');
+    Route::get('/reports/teachers', [ReportsController::class, 'teachers'])->name('reports.teachers');
+    // Sensitive financial reports: block partial admins/secretaries via middleware
+    // داخل مجموعة auth middleware
+    Route::prefix('quiz-attempts')->name('quiz-attempts.')->group(function () {
+        Route::get('/', [QuizAttemptsController::class, 'index'])->name('index');
+        Route::get('/student/{studentId}', [QuizAttemptsController::class, 'studentAttempts'])->name('student');
+        Route::get('/{attemptId}', [QuizAttemptsController::class, 'show'])->name('show');
+    });
+    // داخل مجموعة auth
+    Route::prefix('quiz')->name('quiz.')->group(function () {
+        // محاولات الكويزات
+        Route::prefix('attempts')->name('attempts.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\QuizAttemptsController::class, 'index'])->name('index');
+            Route::get('/student/{studentId}', [QuizAttemptsController::class, 'showStudent'])->name('student');
+            Route::get('/{attemptId}', [QuizAttemptsController::class, 'show'])->name('show');
+            Route::delete('/{attemptId}', [QuizAttemptsController::class, 'destroy'])->name('destroy');
+        });
+
+        // محاولات كويز معين (من صفحة الكويز)
+        Route::get('/{quizId}/attempts', [QuizzesController::class, 'showAttempts'])->name('quizzes.attempts');
+    });
+    Route::middleware([\App\Http\Middleware\BlockRestrictedReports::class])->group(function () {
+        Route::get('/reports/revenue', [ReportsController::class, 'revenue'])->name('reports.revenue');
+        Route::get('/reports/expenses', [ReportsController::class, 'expenses'])->name('reports.expenses');
+        Route::get('/reports/profit', [ReportsController::class, 'profit'])->name('reports.profit');
+
+        Route::get('/reports/export/excel/{type}', [ReportsController::class, 'exportExcel'])->name('reports.export.excel');
+        Route::get('/reports/export/powerpoint/{type}', [ReportsController::class, 'exportPowerPoint'])->name('reports.export.powerpoint');
+        Route::post('/reports/export/all-charts', [ReportsController::class, 'exportAllCharts'])->name('reports.export.all.charts');
+        Route::get('/reports/filter', [ReportsController::class, 'filter'])->name('reports.filter');
+    });
+    // إنشاء فاتورة جديدة
+    Route::post('/invoices/create', [InvoicesController::class, 'createInvoice'])->name('invoices.create');
+
+    Route::delete('/sessions/{session}', [SessionsController::class, 'destroy'])->name('sessions.destroy');
+
+    Route::get('/bookings/{id}/edit', [BookingController::class, 'edit'])->name('bookings.edit');
+    Route::put('/bookings/{id}', [BookingController::class, 'update'])->name('bookings.update');
+    Route::delete('/bookings/{id}', [BookingController::class, 'destroy'])->name('bookings.destroy');
+    // Route for viewing all bookings (يمكن تضيف middleware للادمن بس)
+    Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
+
+    // Teacher salary payment route
+    Route::post('/teachers/{teacher}/salary-management/payment', [TeacherSalariesController::class, 'processPayment'])
+        ->name('teachers.salary_management.payment');
+    // تحديث الخصم0
+    // Teacher Salary Management Routes
+    Route::get('/teachers/{teacher}/salary-management', [TeacherSalariesController::class, 'show'])->name('teachers.salary_management');
+    Route::post('/teachers/{teacher}/salary-management', [TeacherSalariesController::class, 'show']);
+
+    // Adjustment Management Routes - الروتس الناقصة
+    Route::delete('/teachers/{teacher}/adjustments/{adjustment}', [TeacherSalariesController::class, 'deleteAdjustment'])->name('teachers.adjustments.delete');
+    Route::get('/teachers/{teacher}/adjustments/{adjustment}/edit', [TeacherSalariesController::class, 'editAdjustment'])->name('teachers.adjustments.edit');
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}', [TeacherSalariesController::class, 'updateAdjustment'])->name('teachers.adjustments.update');
+    Route::get('/subcourses/{id}/edit', [SubcourseController::class, 'editForm'])->name('edit_subcourse');
+    Route::put('/subcourses/{id}', [SubcourseController::class, 'update'])->name('update_subcourse');
+    Route::delete('/subcourses/{id}', [SubcourseController::class, 'destroy'])->name('delete_subcourse');
+    // Invoice Routes
+    Route::get('/salaries/{salary_id}/get-teachers-for-transfer', [SalaryController::class, 'getTeachersForTransfer'])->name('salaries.getTeachersForTransfer');
+    Route::post('/salaries/{salary}/transfer', [SalaryController::class, 'transferSalary'])->name('salaries.transfer');
+    Route::get('/salaries/transfers', [SalaryController::class, 'showTransfers'])->name('salaries.transfers');
+    Route::post('/transfers/{transfer_id}/pay', [SalaryController::class, 'payTransferAmount'])->name('transfers.pay');
+    Route::get('/invoices/{invoice_id}/edit', [InvoicesController::class, 'edit'])->name('invoices.edit');
+    Route::put('/invoices/{invoice_id}', [InvoicesController::class, 'update'])->name('invoices.update');
+    Route::delete('/invoices/{invoice_id}', [InvoicesController::class, 'destroy'])->name('invoices.destroy');
+    Route::delete('/invoices/{invoice_id}/force', [InvoicesController::class, 'forceDestroy'])->name('invoices.forceDestroy');
+    Route::post('/invoices/{invoice_id}/discount', [InvoicesController::class, 'updateDiscount']);
+    Route::get('/groups/get-subcourses/{courseId}', [GroupsController::class, 'getSubcoursesByCourse'])->name('groups.getSubcourses');
+    // User management routes
+    Route::resource('users', UserController::class);
+    Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+    // رابط تحويل مجموعة الانتظار إلى مجموعة دراسية
+    Route::get(
+        '/groups/create-from-waiting/{waitingGroupId}',
+        [GroupsController::class, 'createFromWaiting']
+    )->name('groups.create-from-waiting');
+    Route::get('/users/{user}/get', [UserController::class, 'getUser'])->name('users.get');
+    Route::get('/users/fetch/data', [UserController::class, 'fetchUsers'])->name('users.fetch');
+    // routes/web.php
+    Route::get('/groups/get-subcourses/{courseId}', [GroupsController::class, 'getSubcoursesByCourse'])->name('groups.get-subcourses');
+    // Admin permissions UI removed; permissions are stored in admin_types flags.
+    // داخل مجموعة auth
+    // Add these routes inside the auth middleware group
+    // داخل مجموعة auth
+    // في ملف routes/web.php ضمن مجموعة auth
+    Route::prefix('reports/money')->name('reports.money.')->group(function () {
+        Route::get('/', [MoneyReportsController::class, 'index'])->name('index');
+
+        // التقارير الأساسية
+        Route::get('/daily', [MoneyReportsController::class, 'dailyReport'])->name('daily');
+        Route::get('/weekly', [MoneyReportsController::class, 'weeklyReport'])->name('weekly');
+        Route::get('/monthly', [MoneyReportsController::class, 'monthlyReport'])->name('monthly');
+        Route::get('/annual', [MoneyReportsController::class, 'annualReport'])->name('annual');
+        Route::get('/overall', [MoneyReportsController::class, 'overallReport'])->name('overall');
+
+        // Dynamic type endpoint
+        Route::get('/{type}', [MoneyReportsController::class, 'getReportByType'])->name('type');
+
+        // الإجراءات الأخرى
+        Route::get('/transaction/detail', [MoneyReportsController::class, 'transactionDetail'])->name('transaction.detail');
+        Route::post('/transaction/status', [MoneyReportsController::class, 'changeTransactionStatus'])->name('transaction.status');
+        Route::get('/export', [MoneyReportsController::class, 'exportExcel'])->name('export');
+    });
+    // في routes/web.php أو routes/api.php
+
+    // Back-compat convenience routes (some frontend code may call these relative endpoints)
+    Route::get('/transaction', [MoneyReportsController::class, 'transactionDetail']);
+    Route::post('/transaction/status', [MoneyReportsController::class, 'changeTransactionStatus']);
+
+    Route::post('/waiting-groups/{group}/add-single-student', [WaitingGroupController::class, 'addSingleStudent'])
+        ->name('waiting-groups.add-single-student');
+    // routes/web.php
+    Route::post('/invoices/{invoice_id}/reset-payments', [InvoicesController::class, 'resetPayments'])->name('invoices.resetPayments');
+    // Student dashboard route
+    Route::get('/student_dashboard', [\App\Http\Controllers\StudentDashboardController::class, 'dashboard'])->name('student.dashboard');
+    // Student materials
+    Route::get('/student/materials', [\App\Http\Controllers\StudentMaterialsController::class, 'index'])->name('student.materials.index');
+    Route::get('/student/sessions/{id}/materials', [\App\Http\Controllers\StudentMaterialsController::class, 'sessionMaterials'])->name('student.sessions.materials');
+
+    // Student submit assignment routes
+    Route::get('/student_submit_assignment', [\App\Http\Controllers\StudentDashboardController::class, 'submitAssignment'])->name('student.submit_assignment');
+    Route::post('/student_submit_assignment', [\App\Http\Controllers\StudentDashboardController::class, 'processSubmission'])->name('student.submit_assignment.post');
+    Route::get('/transfers/{transfer_id}/edit', [SalaryController::class, 'editTransfer'])->name('transfers.edit');
+
+    // Update Transfer Route
+    Route::put('/transfers/{transfer_id}', [SalaryController::class, 'updateTransfer'])->name('transfers.update');
+    Route::post('/salary-transfers/{transfer_id}/pay-to-beneficiary', [SalaryController::class, 'payTransferToBeneficiary'])
+        ->name('salary-transfers.pay-to-beneficiary');
+    // مسارات التحويلات
+    Route::post('/salaries/{salary_id}/transfer', [SalaryController::class, 'transferSalary'])->name('salaries.transfer');
+    Route::get('/salaries/transfers', [SalaryController::class, 'showTransfers'])->name('salaries.transfers');
+    Route::get('/salaries/transfers/{transfer_id}/edit', [SalaryController::class, 'editTransfer'])->name('salaries.edit_transfer');
+    Route::put('/salaries/transfers/{transfer_id}', [SalaryController::class, 'updateTransfer'])->name('salaries.update_transfer');
+    Route::delete('/salaries/transfers/{transfer_id}', [SalaryController::class, 'destroyTransfer'])->name('salaries.destroy_transfer');
+    Route::post('/salaries/transfers/{transfer_id}/pay', [SalaryController::class, 'payTransferAmount'])->name('salaries.pay_transfer');
+    Route::post('/salaries/transfers/{transfer_id}/confirm', [SalaryController::class, 'confirmTransferPayment'])->name('salaries.confirm_transfer');
+    // Delete Transfer Route
+    Route::delete('/transfers/{transfer_id}', [SalaryController::class, 'destroyTransfer'])->name('transfers.destroy');
+    // Routes for teacher adjustments with salary linking
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}/mark-paid', [TeacherSalariesController::class, 'markAdjustmentPaid'])->name('teachers.adjustments.mark_paid');
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}/mark-unpaid', [TeacherSalariesController::class, 'markAdjustmentUnpaid'])->name('teachers.adjustments.mark_unpaid');
+    Route::delete('/teachers/{teacher}/adjustments/{adjustment}/delete', [TeacherSalariesController::class, 'deleteAdjustment'])->name('teachers.adjustments.delete');
+    Route::get('/teachers/{teacher}/adjustments/{adjustment}/edit', [TeacherSalariesController::class, 'editAdjustment'])->name('teachers.adjustments.edit');
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}/update', [TeacherSalariesController::class, 'updateAdjustment'])->name('teachers.adjustments.update');
+    // Confirm Payment (Mark as Paid) Route
+    Route::post('/transfers/{transfer_id}/confirm-payment', [SalaryController::class, 'confirmTransferPayment'])->name('transfers.confirm-payment');
+    // Student quiz routes
+    Route::get('/take_quiz', [\App\Http\Controllers\StudentQuizController::class, 'takeQuiz'])->name('student.take_quiz');
+    Route::post('/take_quiz', [\App\Http\Controllers\StudentQuizController::class, 'takeQuiz'])->name('student.take_quiz.post');
+
+    // Student assignments route
+    Route::get('/my_assignments', [\App\Http\Controllers\StudentDashboardController::class, 'myAssignments'])->name('student.my_assignments');
+    Route::get('/student_quiz_results', [\App\Http\Controllers\StudentQuizController::class, 'quizResults'])->name('student.quiz.results');
+    Route::get('/my_quizzes', [\App\Http\Controllers\StudentQuizController::class, 'myQuizzes'])->name('student.my_quizzes');
+
+    // Student certificates routes
+    Route::get('/student/certificates', [\App\Http\Controllers\StudentDashboardController::class, 'certificates'])->name('student.certificates.index');
+    Route::get('/student/certificate/{id}/view', [\App\Http\Controllers\StudentDashboardController::class, 'viewCertificate'])->name('student.certificates.view');
+    Route::post('/student/certificate-request', [\App\Http\Controllers\StudentDashboardController::class, 'requestCertificate'])->name('student.certificates.request');
+
+    // Salary routes
+    Route::get('/salaries', [SalaryController::class, 'index'])->name('salaries.index');
+    Route::get('/salaries/{salary}', [SalaryController::class, 'show'])->name('salaries.show');
+    Route::get('/salaries/{salary}/pay', [SalaryController::class, 'pay'])->name('salaries.pay');
+    Route::post('/salaries/{salary}/pay', [SalaryController::class, 'processPayment'])->name('salaries.processPayment');
+
+    // Invoice routes (for salary invoices)
+    Route::get('/invoices/{salary}', [SalaryController::class, 'showInvoice'])->name('invoices.show');
+    Route::post('/invoices/mark-all-paid', [\App\Http\Controllers\InvoicesController::class, 'markAllAsPaid'])->name('invoices.markAllPaid');
+    Route::get('/salaries/calculate', [SalaryController::class, 'calculateSalaries'])->name('salaries.calculate');
+    Route::post('/salaries/calculate', [SalaryController::class, 'processCalculation'])->name('salaries.calculate.process');
+    Route::delete('/waiting-groups/delete-group/{safeGroupName}', [BookingController::class, 'deleteWaitingGroup'])->name('waiting-groups.delete-group');
+    // حاول هذا الراوت بدلاً من ذلك
+    Route::get('/waiting-groups/edit/{groupId}', [WaitingGroupController::class, 'edit'])->name('waiting-groups.edit');
+    Route::post('/waiting-groups/delete-group', [BookingController::class, 'deleteWaitingGroup'])->name('waiting-groups.delete-group-post');
+    Route::get('/waiting-groups/{id}/search-students', [WaitingGroupController::class, 'searchStudents'])
+        ->name('waiting-groups.search-students');
+    // في ملف routes/web.php
+    Route::post('/waiting-groups/{id}/add-student', [WaitingGroupController::class, 'addSingleStudent'])
+        ->name('waiting-groups.add-student');
+    Route::get('/salaries/{salary_id}/diagnose', [SalaryController::class, 'diagnosePaymentIssue'])->name('salaries.diagnose');
+    Route::post('/salaries/search', [SalaryController::class, 'search'])->name('salaries.search');
+    Route::delete('/invoices/{invoice_id}/payments', [InvoicesController::class, 'deletePayments'])->name('invoices.deletePayments');
+    Route::middleware(['auth'])->group(function () {
+        // Schedules Routes
+        Route::get('/schedules', [SchedulesController::class, 'index'])->name('schedules.index');
+        Route::get('/schedules/weekly', [SchedulesController::class, 'weeklyCalendar'])->name('schedules.weekly');
+        Route::get('/schedules/monthly', [SchedulesController::class, 'monthlyCalendar'])->name('schedules.monthly');
+        Route::get('/schedules/annual', [SchedulesController::class, 'annualCalendar'])->name('schedules.annual');
+        Route::get('/schedules/create', [SchedulesController::class, 'create'])->name('schedules.create');
+        Route::post('/schedules/store', [SchedulesController::class, 'store'])->name('schedules.store');
+        Route::get('/schedules/{schedule}/edit', [SchedulesController::class, 'edit'])->name('schedules.edit');
+        Route::put('/schedules/{schedule}', [SchedulesController::class, 'update'])->name('schedules.update');
+        Route::delete('/schedules/{schedule}', [SchedulesController::class, 'destroy'])->name('schedules.destroy');
+        Route::post('/schedules/{schedule}/toggle-status', [SchedulesController::class, 'toggleStatus'])->name('schedules.toggle-status');
+
+        // Rooms Routes
+
+        Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
+        Route::resource('rooms', RoomController::class)->except(['index']); // استثني index
+        Route::post('/rooms/store', [RoomController::class, 'store'])->name('rooms.store');
+        Route::get('/rooms/{room}/edit', [RoomController::class, 'edit'])->name('rooms.edit');
+        Route::put('/rooms/{room}', [RoomController::class, 'update'])->name('rooms.update');
+        Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])->name('rooms.destroy');
+        Route::post('/rooms/{room}/toggle-status', [RoomController::class, 'toggleStatus'])->name('rooms.toggle-status');
+    });
+    Route::delete('certificates/{certificate}', [CertificateController::class, 'destroy'])
+        ->name('certificates.destroy');
+
+    Route::prefix('schedules')->group(function () {
+        Route::get('/', [SchedulesController::class, 'index'])->name('schedules.index');
+        Route::get('/weekly', [SchedulesController::class, 'weeklyCalendar'])->name('schedules.weekly');
+        Route::get('/monthly', [SchedulesController::class, 'monthlyCalendar'])->name('schedules.monthly');
+        Route::get('/annual', [SchedulesController::class, 'annualCalendar'])->name('schedules.annual');
+
+        Route::get('/create', [SchedulesController::class, 'create'])->name('schedules.create');
+        Route::post('/store', [SchedulesController::class, 'store'])->name('schedules.store');
+
+        Route::get('/{schedule}/edit', [SchedulesController::class, 'edit'])->name('schedules.edit');
+        Route::put('/{schedule}', [SchedulesController::class, 'update'])->name('schedules.update');
+        Route::delete('/{schedule}', [SchedulesController::class, 'destroy'])->name('schedules.destroy');
+
+        Route::post('/check-availability', [SchedulesController::class, 'checkAvailability'])
+            ->name('schedules.check-availability');
+
+        Route::post('/{schedule}/toggle-status', [SchedulesController::class, 'toggleStatus'])
+            ->name('schedules.toggle-status');
+
+        // ✅ Drag & Drop Update Time Route (المفقود)
+        Route::post('/update-time', [SchedulesController::class, 'updateTime'])
+            ->name('schedules.update-time');
+    });
+    Route::resource('capital', CapitalController::class)->names([
+        'index' => 'capital.index',
+        'create' => 'capital.create',
+        'store' => 'capital.store',
+        'show' => 'capital.show',
+        'edit' => 'capital.edit',
+        'update' => 'capital.update',
+        'destroy' => 'capital.destroy',
+    ]);
+    // Assignment routes
+    Route::get('/assignments/{id}/edit', [SessionsController::class, 'editAssignment'])->name('assignments.edit');
+    Route::put('/assignments/{id}', [SessionsController::class, 'updateAssignment'])->name('assignments.update');
+    Route::delete('/assignments/{id}', [SessionsController::class, 'destroyAssignment'])->name('assignments.destroy');
+    // Salary creation routes
+    Route::delete('/waiting-groups/{id}/delete-group', [BookingController::class, 'deleteWaitingGroup'])->name('waiting-groups.delete-group');
+    Route::resource('waiting-groups', WaitingGroupController::class);
+    Route::post('/waiting-groups/{id}/add-student', [BookingController::class, 'addStudentToWaitingGroup'])->name('waiting-groups.add-student');
+    Route::get('/waiting-groups/{id}/edit', [WaitingGroupController::class, 'edit'])->name('waiting-groups.edit');
+    Route::put('/waiting-groups/{id}', [WaitingGroupController::class, 'update'])->name('waiting-groups.update');
+    Route::delete('/waiting-groups/{id}', [WaitingGroupController::class, 'destroy'])->name('waiting-groups.destroy');
+
+    Route::post('/waiting-groups/{groupName}/add-student', [BookingController::class, 'addStudentToWaitingGroup'])->name('waiting-groups.add-student');
+
+    // Material routes
+    Route::put('/session-materials/{materialId}', [SessionsController::class, 'updateMaterial'])->name('sessions.materials.update');
+    Route::delete('/session-materials/{materialId}', [SessionsController::class, 'destroyMaterial'])->name('sessions.materials.destroy');
+    // Routes for expenses
+    Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index');
+    Route::get('/expenses/add', [ExpenseController::class, 'add'])->name('expenses.add');
+    Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::patch('/expenses/{expense}/approve', [ExpenseController::class, 'approve'])->name('expenses.approve');
+    Route::patch('/expenses/{expense}/reject', [ExpenseController::class, 'reject'])->name('expenses.reject');
+    Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
+    // Assignments routes are defined via resource and supplemental routes later in the file
+    // Salary Edit & Delete Routes
+    Route::get('/salaries/{salary}/edit', [SalaryController::class, 'edit'])->name('salaries.edit');
+    Route::put('/salaries/{salary}', [SalaryController::class, 'update'])->name('salaries.update');
+    Route::delete('/salaries/{salary}', [SalaryController::class, 'destroy'])->name('salaries.destroy');
+    // Salary Transfer Routes - تأكد من أن هذه موجودة
+    Route::get('/salaries/{salary_id}/get-teachers-for-transfer', [SalaryController::class, 'getTeachersForTransfer'])->name('salaries.getTeachersForTransfer');
+    Route::post('/salaries/{salary}/transfer', [SalaryController::class, 'transferSalary'])->name('salaries.transfer');
+    // routes/web.php
+    Route::get('/groups/create', [GroupsController::class, 'create'])->name('groups.create');
+    // Profile routes
+    // Add this with your other salary routes
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::get('/activities/search', [ActivityController::class, 'search'])->name('activities.search');
+    // Activity routes
+    Route::get('/activities/{id}/details', [ActivityController::class, 'details'])->name('activities.details');
+    // Route للترقية
+    Route::resource('groups', GroupsController::class);
+    // Inside auth middleware group
+    Route::get('/api/waiting-groups', [WaitingGroupController::class, 'getWaitingGroups'])->name('api.waiting-groups');
+    Route::post('/students/add-to-waiting-group', [WaitingGroupController::class, 'addStudentFromStudentsPage'])->name('students.add-to-waiting-group');
+    // داخل مجموعة auth
+    // داخل مجموعة auth
+    Route::prefix('api')->group(function () {
+        Route::get('/groups/available-for-transfer', [GroupsController::class, 'getAvailableGroupsForTransfer']);
+        Route::post('/transfer-student', [GroupsController::class, 'transferStudent']);
+    });
+    Route::get('/add_course', [\App\Http\Controllers\CourseController::class, 'addForm'])->name('add_course');
+    Route::get('/courses/create', [\App\Http\Controllers\CourseController::class, 'create'])->name('courses.create');
+    Route::get('/courses', [\App\Http\Controllers\CourseController::class, 'index'])->name('courses');
+    Route::delete('/subcourses/{id}', [CourseController::class, 'deleteSubcourse'])->name('delete_subcourse');
+    // Routes للـ Subcourses
+    Route::get('/groups/{group}/student-ratings/{student}', [GroupsController::class, 'getStudentRatings'])->name('groups.student-ratings');
+    Route::get('/courses/{courseId}/subcourses', [CourseController::class, 'showSubcourses'])->name('subcourses');
+
+    Route::post('/store_course', [\App\Http\Controllers\CourseController::class, 'store'])->name('store_course');
+    Route::get('/edit_course/{id}', [\App\Http\Controllers\CourseController::class, 'editForm'])->name('edit_course');
+    Route::post('/update_course/{id}', [\App\Http\Controllers\CourseController::class, 'update'])->name('update_course');
+
+    Route::get('/ajax/fetch-courses', [\App\Http\Controllers\CourseController::class, 'fetch'])->name('courses.fetch');
+    Route::get('/subcourses', [\App\Http\Controllers\SubcourseController::class, 'index'])->name('subcourses');
+    Route::get('/add_subcourse', [\App\Http\Controllers\SubcourseController::class, 'addForm'])->name('add_subcourse');
+    Route::post('/store_subcourse', [\App\Http\Controllers\SubcourseController::class, 'store'])->name('store_subcourse');
+    Route::get('/courses', [\App\Http\Controllers\CourseController::class, 'index'])->name('courses');
+    Route::get('/ajax/fetch-courses', [\App\Http\Controllers\CourseController::class, 'fetch']);
+    Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/groups/students/search', [GroupsController::class, 'searchStudents'])->name('groups.students.search');
+    // Teachers management routes
+    Route::resource('teachers', \App\Http\Controllers\TeachersController::class);
+    Route::get('/teachers/fetch/data', [\App\Http\Controllers\TeachersController::class, 'fetchTeachers'])->name('teachers.fetch');
+    Route::get('/teachers/{teacher}/get', [\App\Http\Controllers\TeachersController::class, 'getTeacher'])->name('teachers.get');
+    Route::get('/teacher_dashboard', [\App\Http\Controllers\TeachersController::class, 'dashboard'])->name('teacher.dashboard');
+    // طرق التسجيل العامة
+    // داخل مجموعة auth
+    Route::get('/quizzes-by-group/{groupId}', function ($groupId) {
+        $quizzes = Quiz::whereHas('session.group', function ($q) use ($groupId) {
+            $q->where('group_id', $groupId);
+        })->get();
+
+        return response()->json(['quizzes' => $quizzes]);
+    })->middleware('auth:sanctum');
+    // Quiz Attempts Routes
+    // Salary Transfer Routes
+
+    Route::get('/quiz-attempts', [QuizAttemptsController::class, 'index'])->name('quiz.attempts.index');
+    Route::get('/quiz-attempts/{attemptId}', [QuizAttemptsController::class, 'show'])->name('quiz.attempts.show');
+    Route::get('/quiz-attempts/student/{studentId}/attempt/{attemptId}', [QuizAttemptsController::class, 'showStudentAttempt'])->name('quiz.attempts.student.attempt');
+    Route::delete('/quiz-attempts/{attemptId}', [QuizAttemptsController::class, 'destroy'])->name('quiz.attempts.destroy');
+    Route::get('/users/stats', [UserController::class, 'getStats'])->name('users.stats');
+    Route::post('/impersonate/stop', [UserController::class, 'stopImpersonate'])->name('impersonate.stop');
+    // Teacher salary management routes
+    Route::get('/teachers/{teacher_id}/salaries', [\App\Http\Controllers\TeacherSalariesController::class, 'show'])->name('teachers.salaries');
+    Route::post('/teachers/{teacher_id}/salaries', [\App\Http\Controllers\TeacherSalariesController::class, 'show'])->name('teachers.salaries.adjustment');
+    Route::get('/teachers/{teacher_id}/salaries/fetch', [\App\Http\Controllers\TeacherSalariesController::class, 'fetchSalaries'])->name('teachers.salaries.fetch');
+    Route::get('/students/search', [StudentsController::class, 'search'])->name('students.search');
+    // Department routes
+    // Department routes - Clean version
+    Route::resource('departments', DepartmentController::class);
+    Route::get('/departments/fetch/data', [DepartmentController::class, 'fetch'])->name('departments.fetch');
+    Route::get('/departments/{department}/get', [DepartmentController::class, 'get'])->name('departments.get');
+    Route::get('/departments/teachers/list', [DepartmentController::class, 'getTeachers'])->name('departments.teachers.list');
+    Route::get('/students', [\App\Http\Controllers\StudentsController::class, 'index'])->name('students.index');
+    Route::get('/students/fetch', [\App\Http\Controllers\StudentsController::class, 'fetch'])->name('students.fetch');
+    Route::post('/students/update', [\App\Http\Controllers\StudentsController::class, 'update'])->name('students.update');
+    Route::post('/students/delete', [\App\Http\Controllers\StudentsController::class, 'delete'])->name('students.delete');
+
+    // Student info page route
+    Route::get('/student_info', [\App\Http\Controllers\StudentInfoController::class, 'show'])->name('student.info');
+
+    // Student invoices page route
+    Route::get('/student_invoices_admin/{student_id}', [\App\Http\Controllers\StudentInvoicesController::class, 'show'])->name('student.invoices');
+    Route::post('/student_invoices_admin/create', [\App\Http\Controllers\StudentInvoicesController::class, 'createInvoice'])->name('student.invoices.create');
+
+    // Student invoice view route
+    Route::get('/view_invoice/{id}', [\App\Http\Controllers\StudentInvoiceViewController::class, 'show'])->name('student.invoice.view');
+
+    // Student invoices page route
+    Route::get('/student_invoices', [\App\Http\Controllers\StudentInvoicesController::class, 'studentInvoices'])->name('student.invoices.view');
+
+    // Invoices routes
+    Route::get('/invoices', [\App\Http\Controllers\InvoicesController::class, 'index'])->name('invoices.index');
+    Route::get('/invoices/fetch/data', [\App\Http\Controllers\InvoicesController::class, 'fetchInvoices'])->name('invoices.fetch');
+
+    // Student payment routes
+    Route::get('/add_payment/{invoice_id}', [\App\Http\Controllers\StudentPaymentController::class, 'show'])->name('student.payment.show');
+    Route::post('/add_payment', [\App\Http\Controllers\StudentPaymentController::class, 'processPayment'])->name('student.payment.process');
+
+    // Debug route to test fetch connectivity
+    Route::get('/students/fetch-debug', function () {
+        return response()->json(['success' => true, 'message' => 'Fetch debug route working']);
+    })->name('students.fetch-debug');
+    Route::get('/ajax/fetch-courses', [CourseController::class, 'fetch'])->name('courses.fetch');
+    // Ratings routes
+    Route::get('/admin/ratings', [RatingController::class, 'admin'])->name('ratings.admin');
+    Route::get('/fetch-ratings', [RatingController::class, 'fetch'])->name('ratings.fetch');
+    Route::get('/ratings/{id}/edit', [RatingController::class, 'edit'])->name('ratings.edit');
+    Route::put('/ratings/{id}', [RatingController::class, 'update'])->name('ratings.update');
+    Route::delete('/ratings/{id}', [RatingController::class, 'destroy'])->name('ratings.destroy');
+    // Add this with your other expense routes
+    Route::delete('/expenses/{expense}', [\App\Http\Controllers\ExpenseController::class, 'destroy'])->name('expenses.destroy');
+    Route::delete('/sessions/{session}/force', [SessionsController::class, 'forceDestroy'])->name('sessions.forceDestroy');
+    // Groups routes
+    // في مجموعة auth، بعد routes طلبات التسجيل
+    // Routes for username validation
+    Route::get('/users/suggest-username/{username}', [UserController::class, 'suggestUsername'])->name('users.suggestUsername');
+    Route::post('/students/{user}/add-to-waiting-group', [UserController::class, 'addStudentToWaitingGroup'])
+        ->name('students.add-to-waiting-group');
+    Route::post('/students/{student}/add-to-waiting-group', [UserController::class, 'addStudentToWaitingGroup'])
+        ->name('students.add-to-waiting-group');
+    Route::resource('groups', \App\Http\Controllers\GroupsController::class);
+    // في web.php
+    Route::get('/register/student', [UserController::class, 'showRegistrationForm'])->name('register.form');
+    Route::post('/register/student', [UserController::class, 'registerStudent'])->name('register.submit');
+    Route::get('/groups/fetch/data', [GroupsController::class, 'fetchData'])->name('groups.fetch.data');
+    Route::get('/groups/{id}/get', [\App\Http\Controllers\GroupsController::class, 'getGroup'])->name('groups.get');
+    Route::get('/group_details', [\App\Http\Controllers\GroupsController::class, 'details'])->name('groups.details');
+    Route::get('/reports/detailed-financial', [ReportsController::class, 'getDetailedFinancialData'])->name('reports.detailed-financial');
+    Route::get('/groups/get-groups-by-teacher/{teacherId}', [GroupsController::class, 'getGroupsByTeacher'])->name('groups.getGroupsByTeacher');
+    Route::post('/salaries/create-for-group', [GroupsController::class, 'createSalaryForGroup'])->name('salaries.createForGroup');
+    // Route::get('/salaries/get-groups-by-teacher', [SalaryController::class, 'getGroupsByTeacher'])->name('salaries.getGroupsByTeacher');
+    // Route::get('/salaries/get-group-details-for-salary', [SalaryController::class, 'getGroupDetailsForSalary'])->name('salaries.getGroupDetailsForSalary');
+    Route::get('/teachers/{teacher}/salary-management', [TeacherSalariesController::class, 'show'])->name('teachers.salary_management');
+    Route::post('/teachers/{teacher}/salary-management', [TeacherSalariesController::class, 'show']);
+    Route::post('/teachers/{teacher}/salary-management/payment', [TeacherSalariesController::class, 'processPayment'])->name('teachers.salary_management.payment');
+    Route::put('/teachers/{teacher}/salary-management/updatepayment', [TeacherSalariesController::class, 'updatePayment'])->name('teachers.salary_management.update_payment');
+    Route::put('/teachers/{teacher}/salary-management/mark-unpaid', [TeacherSalariesController::class, 'markUnpaid'])->name('teachers.salary_management.mark_unpaid');
+    Route::delete('/teachers/{teacher}/salary-management/delete', [TeacherSalariesController::class, 'deleteSalary'])->name('teachers.salary_management.delete');
+    Route::get('/salaries/get-groups-by-teacher', [SalaryController::class, 'getGroupsByTeacher'])->name('salaries.getGroupsByTeacher');
+    // In routes/web.php, inside the auth middleware group
+    Route::get('/salaries/get-groups-by-teacher', [SalaryController::class, 'getGroupsByTeacher'])->name('salaries.getGroupsByTeacher');
+    Route::get('/salaries/get-group-details-for-salary', [SalaryController::class, 'getGroupDetailsForSalary'])->name('salaries.getGroupDetailsForSalary');
+    // Adjustment Management Routes
+    // داخل مجموعة الـ auth
+    // Add email validation route
+    // داخل مجموعة auth
+    // داخل مجموعة auth
+    // في routes/web.php
+
+    Route::prefix('api')->group(function () {
+        Route::get('/courses/{course}/info', function ($courseId) {
+            try {
+                $course = \App\Models\Course::find($courseId);
+
+                if (! $course) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'الكورس غير موجود',
+                    ]);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'course_id' => $course->course_id,
+                        'course_name' => $course->course_name,
+                        'description' => $course->description,
+                        'price' => $course->price,
+                        'status' => $course->status,
+                        'duration' => $course->duration,
+                        'subcourses_count' => $course->subcourses()->count(),
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'حدث خطأ',
+                ], 500);
+            }
+        });
+
+        Route::post('/students/{user}/update-course', [UserController::class, 'updatePreferredCourse'])
+            ->name('api.students.update-course');
+    });
+    Route::get('/students/{student}/payment-status', function ($studentId) {
+        try {
+            $student = \App\Models\Student::with(['invoices'])->find($studentId);
+
+            if (! $student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found',
+                ]);
+            }
+
+            $totalPaid = $student->invoices->sum('amount_paid');
+            $totalRequired = $student->invoices->sum('amount');
+            $hasDebt = $totalPaid < $totalRequired;
+
+            return response()->json([
+                'success' => true,
+                'student_id' => $studentId,
+                'total_paid' => $totalPaid,
+                'total_required' => $totalRequired,
+                'has_debt' => $hasDebt,
+                'balance' => $totalRequired - $totalPaid,
+                'invoices_count' => $student->invoices->count(),
+                'invoices' => $student->invoices->map(function ($invoice) {
+                    return [
+                        'id' => $invoice->invoice_id,
+                        'amount' => $invoice->amount,
+                        'amount_paid' => $invoice->amount_paid,
+                        'status' => $invoice->status,
+                        'due_date' => $invoice->due_date,
+                    ];
+                }),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error checking payment status: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error',
+            ], 500);
+        }
+    })->name('students.payment-status');
+    // داخل مجموعة auth
+    // داخل مجموعة auth
+    Route::prefix('reports/groups-financial')->group(function () {
+        Route::get('/export', [StudentReportController::class, 'exportGroupsFinancialReport'])
+            ->name('reports.groups-financial.export');
+
+        Route::get('/alerts/send', [StudentReportController::class, 'sendGroupsFinancialAlerts'])
+            ->name('reports.groups-financial.alerts.send');
+
+        Route::get('/group/{groupId}/students', [StudentReportController::class, 'getGroupStudentsWithInvoices'])
+            ->name('reports.groups-financial.group.students');
+
+        Route::get('/summary', function () {
+            try {
+                $today = \Carbon\Carbon::now();
+                $controller = new StudentReportController;
+                $data = $controller->getGroupsFinancialData('daily', $today->format('Y-m-d'), null, null);
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $data['stats'],
+                    'today' => $today->format('Y-m-d'),
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'حدث خطأ',
+                ], 500);
+            }
+        })->name('reports.groups-financial.summary');
+    });
+    // Routes for student registration reports
+    Route::prefix('reports/registrations')->group(function () {
+        Route::get('/', [StudentRegistrationReportController::class, 'index'])->name('reports.registrations');
+        Route::get('/export', [StudentRegistrationReportController::class, 'exportExcel'])->name('reports.registrations.export');
+        Route::get('/statistics', [StudentRegistrationReportController::class, 'courseStatistics'])->name('reports.registrations.statistics');
+        Route::get('/{id}', [StudentRegistrationReportController::class, 'show'])->name('reports.registrations.show');
+        Route::post('/{id}/update-course', [StudentRegistrationReportController::class, 'updateCourseSelection'])->name('reports.registrations.update-course');
+    });
+    Route::post('/students/{userId}/add-to-waiting-group', [UserController::class, 'addStudentToWaitingGroup'])->name('students.add-to-waiting-group');
+    Route::delete('/pending-students/{user}/reject', [UserController::class, 'rejectAndDeleteStudent'])->name('pending.students.reject.delete');
+    // تحقق من تطابق بيانات الدفع
+    Route::get('/salaries/{salary}/verify-payments', [SalaryController::class, 'verifyPaymentConsistency'])
+        ->name('salaries.verifyPayments');
+
+    // إصلاح بيانات الدفع
+    Route::post('/salaries/{salary}/fix-payments', [SalaryController::class, 'fixPaymentData'])
+        ->name('salaries.fixPayments');
+    Route::post('/students/{user}/add-to-waiting-group', [UserController::class, 'addStudentToWaitingGroup'])
+        ->name('students.add-to-waiting-group');
+    Route::delete('/pending-students/{user}/delete', [UserController::class, 'rejectAndDeleteStudent'])
+        ->name('pending.students.reject.delete');
+    Route::delete('/teachers/{teacher}/adjustments/{adjustment}', [TeacherSalariesController::class, 'deleteAdjustment'])->name('teachers.adjustments.delete');
+    Route::get('/teachers/{teacher}/adjustments/{adjustment}/edit', [TeacherSalariesController::class, 'editAdjustment'])->name('teachers.adjustments.edit');
+    Route::get('/salaries/get-group-details-for-salary', [SalaryController::class, 'getGroupDetailsForSalary'])->name('salaries.getGroupDetailsForSalary');
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}', [TeacherSalariesController::class, 'updateAdjustment'])->name('teachers.adjustments.update');
+    Route::get('/groups/{group}/chat', [\App\Http\Controllers\ChatController::class, 'show'])->name('groups.chat');
+    Route::get('/groups/{group}/chat/messages', [\App\Http\Controllers\ChatController::class, 'fetchMessages'])->name('groups.chat.messages');
+    Route::post('/groups/{group}/chat/send', [\App\Http\Controllers\ChatController::class, 'sendMessage'])->name('groups.chat.send');
+    Route::get('/groups/{group}/chat/download/{message}', [\App\Http\Controllers\ChatController::class, 'downloadFile'])->name('groups.chat.download');
+    Route::get('/groups/fetch', [GroupsController::class, 'fetch'])->name('groups.fetch');
+    Route::get('/groups/{id}/get', [GroupsController::class, 'getGroup'])->name('groups.get');
+    Route::get('waiting-groups/get-subcourses/{courseId}', [WaitingGroupController::class, 'getSubcourses'])->name('waiting-groups.get-subcourses');
+    Route::get('/waiting-groups/get-inactive-students', [WaitingGroupController::class, 'getInactiveStudents'])
+        ->name('waiting-groups.get-inactive-students');
+    Route::get('waiting-groups/get-inactive-students', [WaitingGroupController::class, 'getInactiveStudents'])
+        ->name('waiting-groups.get-inactive-students');
+    // Route مباشر بدون اسم (للاختبار)
+    Route::get('get-inactive-students', [WaitingGroupController::class, 'getInactiveStudents']);
+    Route::resource('whitening-groups', WhiteningGroupController::class);
+    Route::get('/whitening-groups/get-students/{courseId}', [WhiteningGroupController::class, 'getStudentsByCourse'])
+        ->name('whitening-groups.get-students');
+    // Add this with your other waiting-group routes
+    Route::post('waiting-groups/{id}/bulk-add-students', [WaitingGroupController::class, 'bulkAddStudents'])
+        ->name('waiting-groups.bulk-add-students');
+    // طلبات  الجديدة (طلاب غير مفعلين)
+    Route::get('/pending-students', [UserController::class, 'pendingStudents'])->name('pending.students');
+    Route::post('/pending-students/{user}/activate', [UserController::class, 'activateStudent'])->name('pending.students.activate');
+    Route::post('/pending-students/{user}/reject', [UserController::class, 'rejectStudent'])->name('pending.students.reject');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // تأكد أن هذا هو الـ Route الصحيح
+    Route::get('waiting-groups', [WaitingGroupController::class, 'index'])->name('waiting-groups.index');
+    Route::post('waiting-groups/{group}/add-student', [WaitingGroupController::class, 'addStudent'])->name('waiting-groups.add-student');
+    Route::delete('waiting-groups/{group}/remove-student/{student}', [WaitingGroupController::class, 'removeStudent'])->name('waiting-groups.remove-student');
+    Route::post('waiting-groups/{group}/update-student-status/{student}', [WaitingGroupController::class, 'updateStudentStatus'])->name('waiting-groups.update-student-status');
+    Route::post('waiting-groups/{group}/transfer-student/{student}', [WaitingGroupController::class, 'transferStudent'])->name('waiting-groups.transfer-student');
+    Route::get('waiting-groups/get-subcourses/{course}', [WaitingGroupController::class, 'getSubcourses'])->name('waiting-groups.get-subcourses');
+    Route::get('/waiting-groups/create', [WaitingGroupController::class, 'create'])->name('waiting-groups.create');
+    Route::post('waiting-groups', [WaitingGroupController::class, 'store'])->name('waiting-groups.store');
+    Route::get('/api/courses/{courseId}/subcourses', [BookingController::class, 'getSubcoursesByCourse']);
+    Route::get('/bookings/{id}/waiting-group', [BookingController::class, 'showWaitingGroupForm'])
+        ->name('bookings.waiting-group-form');
+    Route::post('/bookings/{id}/waiting-group', [BookingController::class, 'addToWaitingGroup'])
+        ->name('bookings.add-to-waiting-group');
+    // في ملف web.php أضف هذا داخل مجموعة auth
+    Route::get('/api/students/by-course/{courseId}', function ($courseId) {
+        try {
+            $students = \App\Models\Student::whereHas('bookings', function ($query) use ($courseId) {
+                $query->where('course_id', $courseId);
+            })
+                ->with('user')
+                ->get()
+                ->map(function ($student) {
+                    return [
+                        'student_id' => $student->student_id,
+                        'name' => $student->user ? $student->user->name : 'غير معروف',
+                        'phone' => $student->user ? $student->user->phone : null,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'students' => $students,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في جلب الطلاب',
+            ], 500);
+        }
+    })->name('api.students.by-course');
+    // Student sessions route
+    Route::get('/my_sessions', [\App\Http\Controllers\StudentDashboardController::class, 'mySessions'])->name('student.my_sessions');
+    Route::get('/my_sessions/{session_id}', [\App\Http\Controllers\StudentDashboardController::class, 'sessionDetails'])->name('student.session_details');
+    // Student session material download route (بدون material_id)
+    Route::get('/student/session/{session_id}/material/{file_name}/download', [\App\Http\Controllers\StudentDashboardController::class, 'downloadSessionMaterial'])->name('student.session.material.download');
+    Route::get('/waiting-groups/get-available-students', [WaitingGroupController::class, 'getAvailableStudents'])
+        ->name('waiting-groups.get-available-students');
+    Route::get('/waiting-groups/get-students-by-course/{courseId}', [WaitingGroupController::class, 'getStudentsByCourse'])
+        ->name('waiting-groups.get-students-by-course');
+    Route::get('/users/create-from-booking/{booking}', [UserController::class, 'createFromBooking'])->name('users.create-from-booking');
+    // Add this route to your web.php file
+    Route::get('/invoices/get-students-by-group', [InvoicesController::class, 'getStudentsByGroup']);
+    // Routes for creating teacher salaries from groups
+    Route::get('/groups/get-groups-by-teacher/{teacherId}', [GroupsController::class, 'getGroupsByTeacher'])->name('groups.getGroupsByTeacher');
+    Route::post('/groups/create-salary-for-group', [GroupsController::class, 'createSalaryForGroup'])->name('groups.createSalaryForGroup');
+    // Routes for creating teacher salaries from groups
+    Route::get('/groups/get-groups-by-teacher/{teacherId}', [GroupsController::class, 'getGroupsByTeacher'])->name('groups.getGroupsByTeacher');
+    Route::post('/groups/create-salary-for-group', [GroupsController::class, 'createSalaryForGroup'])->name('groups.createSalaryForGroup');
+    Route::get('/groups/get-salary-count/{groupId}', [GroupsController::class, 'getSalaryCount'])->name('groups.getSalaryCount');
+    // في web.php
+    // إضافة هذا الـ Route لجلب معلومات المجموعة
+    Route::get('/api/waiting-groups/{groupName}/info', function ($groupName) {
+        try {
+            $groupInfo = \App\Models\WaitingGroup::where('group_name', $groupName)
+                ->selectRaw('
+                group_name,
+                COUNT(*) as student_count,
+                MAX(created_at) as created_at,
+                MAX(course_id) as course_id
+            ')
+                ->groupBy('group_name')
+                ->first();
+
+            if (! $groupInfo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'المجموعة غير موجودة',
+                ]);
+            }
+
+            $course = \App\Models\Course::find($groupInfo->course_id);
+
+            return response()->json([
+                'success' => true,
+                'group_name' => $groupInfo->group_name,
+                'student_count' => $groupInfo->student_count,
+                'course_name' => $course ? $course->course_name : null,
+                'created_at' => \Carbon\Carbon::parse($groupInfo->created_at)->format('d/m/Y'),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في جلب المعلومات',
+            ], 500);
+        }
+    })->name('waiting-groups.info');
+    Route::get('/api/waiting-groups/{groupName}/students', function ($groupName) {
+        try {
+            $students = \App\Models\WaitingGroup::with('booking')
+                ->where('group_name', $groupName)
+                ->get()
+                ->map(function ($wg) {
+                    return [
+                        'id' => $wg->booking_id,
+                        'name' => $wg->booking ? $wg->booking->name : 'غير معروف',
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'group_name' => $groupName,
+                'students' => $students,
+                'count' => count($students),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في جلب الطلاب',
+            ], 500);
+        }
+    });
+    // في routes/web.php
+    Route::put('/waiting-groups/{id}/transfer', [BookingController::class, 'transferWaitingGroup'])
+        ->name('waiting-groups.transfer');
+    Route::post('/dashboard/add-capital', [DashboardController::class, 'addCapital'])->name('dashboard.addCapital');
+    // Session management within groups
+    // داخل مجموعة الـ auth
+    // routes/web.php
+    // داخل مجموعة auth
+    Route::get('/reports/financial/ajax', [ReportsController::class, 'getFinancialData'])->name('reports.financial.ajax');
+    Route::get('/reports/financial/export-excel', [ReportsController::class, 'exportFinancialExcel'])->name('reports.export.financial.excel');
+    // في web.php
+    Route::get('/reports/financial-new', [FinancialReportsController::class, 'index'])->name('reports.financial.new');
+    Route::get('/reports/financial/export', [FinancialReportsController::class, 'exportExcel'])->name('reports.financial.export');
+    Route::post('/reports/financial/data', [FinancialReportsController::class, 'getData'])->name('reports.financial.data');
+    // routes/web.php (داخل مجموعة الـ auth)
+    Route::get('/bookings/{booking}/transfer-group/{group}', [BookingController::class, 'showTransferForm'])
+        ->name('bookings.transfer-group-form');
+    Route::post('/bookings/{booking}/transfer-group', [BookingController::class, 'transferToWaitingGroup'])
+        ->name('bookings.transfer-waiting-group');
+    // Routes لإدارة مجموعات الانتظار
+    Route::get('/waiting-groups/add-student', [BookingController::class, 'addStudentToWaitingGroupForm'])
+        ->name('waiting-groups.add-student-form');
+    Route::post('/waiting-groups/add-student', [BookingController::class, 'addNewStudentToWaitingGroup'])
+        ->name('waiting-groups.add-student');
+    Route::post('/admin/vault/distribute', [AdminVaultController::class, 'distribute'])->name('admin.vault.distribute');
+    Route::post('/waiting-groups/{studentId}/move-to-group', [BookingController::class, 'moveStudentToGroup'])
+        ->name('waiting-groups.move-to-group');
+    Route::post('/waiting-groups/{studentId}/edit', [BookingController::class, 'editWaitingStudent'])
+        ->name('waiting-groups.edit-student');
+    Route::delete('/waiting-groups/{studentId}/remove', [BookingController::class, 'removeStudentFromGroup'])
+        ->name('waiting-groups.remove-student');
+    Route::get('/admin/vault/withdrawal-details/{id}', [AdminVaultController::class, 'withdrawalDetails'])
+        ->name('admin.vault.withdrawal-details')
+        ->middleware('auth');
+    Route::post('/admin/vault/cancel-completed/{id}', [AdminVaultController::class, 'cancelCompletedWithdrawal'])
+        ->name('admin.vault.cancel-completed')
+        ->middleware('auth');
+    Route::post('/groups/check-schedule-availability', [GroupsController::class, 'checkScheduleAvailability'])
+        ->name('groups.check-schedule-availability');
+    Route::delete('/waiting-groups/{id}', [BookingController::class, 'removeFromWaitingGroup'])
+        ->name('waiting-groups.destroy');
+    Route::post('/bookings/{id}/update-grade', [BookingController::class, 'updatePlacementGrade'])
+        ->name('bookings.update-grade');
+    Route::get('/reports/students/overall/enhanced', [StudentReportController::class, 'enhancedOverallReport']);
+    Route::post('/groups/{group}/sessions', [\App\Http\Controllers\GroupsController::class, 'addSession'])->name('groups.sessions.store');
+    // Assignments routes
+    Route::resource('assignments', \App\Http\Controllers\AssignmentsController::class);
+    Route::get('/assignments/fetch/data', [\App\Http\Controllers\AssignmentsController::class, 'fetchAssignments'])->name('assignments.fetch');
+    Route::get('/assignments/{assignment}/submissions', [\App\Http\Controllers\AssignmentsController::class, 'viewSubmissions'])->name('assignments.submissions');
+    // Legacy route kept for backward compatibility with old links
+    Route::get('/view_submissions', function (\Illuminate\Http\Request $request) {
+        $assignmentId = $request->query('assignment_id');
+        if (! $assignmentId) {
+            abort(404);
+        }
+
+        return redirect()->route('assignments.submissions', ['assignment' => $assignmentId]);
+    })->name('legacy.view_submissions');
+    // داخل مجموعة admin/vault
+    Route::prefix('users')->name('users.')->group(function () {
+        // الروتات الأساسية
+        Route::get('/', [UserController::class, 'index'])->name('index');
+        Route::get('/create', [UserController::class, 'create'])->name('create');
+        Route::post('/', [UserController::class, 'store'])->name('store');
+        Route::get('/{user}/edit', [UserController::class, 'edit'])->name('edit');
+        Route::put('/{user}', [UserController::class, 'update'])->name('update');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
+
+        // AJAX routes
+        Route::get('/fetch/data', [UserController::class, 'fetchData'])->name('fetch.data');
+        Route::get('/stats', [UserController::class, 'getStats'])->name('stats');
+        Route::get('/{user}/details', [UserController::class, 'getUserDetails'])->name('details');
+
+        // الانتحال
+        Route::post('/{user}/impersonate', [UserController::class, 'impersonateUser'])->name('impersonate');
+
+        // التسجيل
+        Route::get('/registration/success/{student_id?}', [UserController::class, 'registrationSuccess'])
+            ->name('registration.success');
+
+        // الطلاب المعلقين
+        Route::get('/pending/students', [UserController::class, 'pendingStudents'])
+            ->name('pending.students');
+        Route::post('/{user}/activate', [UserController::class, 'activateStudent'])
+            ->name('activate.student');
+        Route::post('/{user}/reject', [UserController::class, 'rejectAndDeleteStudent'])
+            ->name('reject.student');
+    });
+    // في مجموعة admin/vault
+    // Impersonation routes
+    Route::middleware(['auth', 'can:impersonate'])->group(function () {
+        Route::post('/users/{user}/impersonate', [UserController::class, 'impersonateUser'])
+            ->name('users.impersonate');
+
+        Route::post('/stop-impersonate', [UserController::class, 'stopImpersonate'])
+            ->name('impersonate.stop');
+    });
+    Route::get('/users/fetch/data', [UserController::class, 'fetchData'])->name('users.fetch.data');
+    Route::get('/users/{user}/details', [UserController::class, 'getUserDetails'])->name('users.details');
+    Route::post('/users/{user}/impersonate', [UserController::class, 'impersonateUser'])->name('users.impersonate');
+    Route::post('/update-percentages', [AdminVaultController::class, 'updatePercentages'])
+        ->name('admin.vault.update-percentages');
+    Route::prefix('admin/vault')->group(function () {
+        Route::get('/', [AdminVaultController::class, 'index'])->name('admin.vault.index');
+        Route::post('/', [AdminVaultController::class, 'store'])->name('admin.vault.store');
+        Route::post('/distribute-profit', [AdminVaultController::class, 'distributeProfit'])->name('admin.vault.distribute');
+        Route::get('/stats', [AdminVaultController::class, 'getVaultStats'])->name('admin.vault.stats');
+
+        Route::get('/my-withdrawals', [AdminVaultController::class, 'myWithdrawals'])->name('admin.vault.my-withdrawals');
+        Route::post('/withdraw', [AdminVaultController::class, 'requestWithdrawal'])->name('admin.vault.withdraw');
+
+        // الروتات للتعديل والحذف
+        Route::put('/withdrawal/{id}/update', [AdminVaultController::class, 'updateWithdrawal'])->name('admin.vault.update-withdrawal');
+        Route::delete('/withdrawal/{id}/delete', [AdminVaultController::class, 'deleteWithdrawal'])->name('admin.vault.delete-withdrawal');
+
+        // الروتات للموافقة والرفض
+        Route::post('/withdrawal/bulk-approve', [AdminVaultController::class, 'bulkApprove'])->name('admin.vault.bulk-approve');
+        Route::post('/withdrawal/{id}/approve', [AdminVaultController::class, 'approveWithdrawal'])->name('admin.vault.approve-withdrawal');
+        Route::post('/withdrawal/{id}/reject', [AdminVaultController::class, 'rejectWithdrawal'])->name('admin.vault.reject-withdrawal');
+        Route::post('/withdrawal/{id}/complete', [AdminVaultController::class, 'completeWithdrawal'])->name('admin.vault.complete-withdrawal');
+
+        Route::put('/percentage/{id}', [AdminVaultController::class, 'updatePercentage'])->name('admin.vault.update-percentage');
+    });
+    // في routes/web.php
+    Route::post('/admin/vault/redistribute-capital', [AdminVaultController::class, 'redistributeCapital'])
+        ->name('admin.vault.redistribute.capital');
+
+    Route::post('/admin/vault/add-capital', [AdminVaultController::class, 'addCapitalToVault'])
+        ->name('admin.vault.add.capital');
+    // Salary record creation routes
+    Route::resource('waiting-groups', WaitingGroupController::class)->except(['show']);
+
+    Route::post('/teachers/{teacher}/create-salary-record', [TeacherSalariesController::class, 'createSalaryRecord'])->name('teachers.create_salary_record');
+    Route::post('/teachers/{teacher}/create-missing-salary-records', [TeacherSalariesController::class, 'createMissingSalaryRecords'])->name('teachers.create_missing_salary_records');
+    // Assignments routes
+    // أضف هذا السطر مع routes waiting-groups الأخرى
+    Route::get('waiting-groups/{id}', [WaitingGroupController::class, 'show'])->name('waiting-groups.show');
+    Route::get('/assignments', [AssignmentsController::class, 'index'])->name('assignments.index');
+    Route::get('/assignments/create', [AssignmentsController::class, 'create'])->name('assignments.create');
+    Route::post('/assignments', [AssignmentsController::class, 'store'])->name('assignments.store');
+    Route::get('/assignments/{assignment}', [AssignmentsController::class, 'show'])->name('assignments.show');
+    Route::get('/assignments/{assignment}/edit', [AssignmentsController::class, 'edit'])->name('assignments.edit');
+    Route::put('/assignments/{assignment}', [AssignmentsController::class, 'update'])->name('assignments.update');
+    Route::delete('/assignments/{assignment}', [AssignmentsController::class, 'destroy'])->name('assignments.destroy');
+    Route::get('/assignments/{assignment_id}/grade/{student_id}', [AssignmentsController::class, 'grade'])->name('assignments.grade');
+    Route::get('/view_submissions', [AssignmentsController::class, 'viewSubmissions'])->name('assignments.view_submissions');
+    Route::get('/grade_assignment', [AssignmentsController::class, 'gradeAssignment'])->name('assignments.grade_assignment');
+    Route::get('/schedules/weekly/print', [SchedulesController::class, 'printWeekly'])->name('schedules.weekly.print');
+    Route::get('/schedules/monthly/print', [SchedulesController::class, 'printMonthly'])->name('schedules.monthly.print');
+    // Sessions routes
+    Route::get('/sessions/{id}', [SessionsController::class, 'show'])->name('sessions.show');
+    Route::get('/sessions/{id}/edit', [SessionsController::class, 'edit'])->name('sessions.edit');
+    Route::put('/sessions/{id}', [SessionsController::class, 'update'])->name('sessions.update');
+    Route::post('/sessions/{id}', [SessionsController::class, 'update'])->name('sessions.update.post');
+    Route::delete('/sessions/{id}', [SessionsController::class, 'destroy'])->name('sessions.destroy');
+    Route::post('/salaries/search', [SalaryController::class, 'search'])->name('salaries.search');
+    // Session materials routes
+    Route::post('/sessions/{id}/materials', [\App\Http\Controllers\SessionMaterialsController::class, 'store'])->name('sessions.materials.store');
+    Route::get('/sessions/materials/{id}/download', [\App\Http\Controllers\SessionMaterialsController::class, 'download'])->name('sessions.materials.download');
+    Route::get('/sessions/materials/{id}/preview', [\App\Http\Controllers\SessionMaterialsController::class, 'preview'])->name('sessions.materials.preview');
+    Route::delete('/sessions/materials/{id}', [\App\Http\Controllers\SessionMaterialsController::class, 'destroy'])->name('sessions.materials.destroy');
+
+    // Replace the existing check-invoices route with this:
+    Route::get('/students/{student}/check-invoices', function ($student) {
+        try {
+            // Check if student exists
+            $studentRecord = \App\Models\Student::find($student);
+
+            if (! $studentRecord) {
+                return response()->json([
+                    'has_unpaid_invoices' => false,
+                    'error' => 'Student not found',
+                ], 404);
+            }
+
+            // Check for unpaid invoices
+            $hasUnpaidInvoices = \App\Models\Invoice::where('student_id', $student)
+                ->where(function ($query) {
+                    $query->where('status', '!=', 'paid')
+                        ->orWhere('amount_paid', '<', DB::raw('amount'));
+                })
+                ->exists();
+
+            return response()->json([
+                'student_id' => $student,
+                'student_name' => $studentRecord->student_name,
+                'has_unpaid_invoices' => $hasUnpaidInvoices,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error checking student invoices: '.$e->getMessage());
+
+            return response()->json([
+                'has_unpaid_invoices' => false,
+                'error' => 'Server error',
+            ], 500);
+        }
+    })->name('students.check-invoices');
+    // Monthly rating route
+    Route::get('/monthly_rating', [\App\Http\Controllers\RatingController::class, 'monthly'])->name('ratings.monthly');
+    Route::post('/save_monthly_ratings', [\App\Http\Controllers\RatingController::class, 'saveMonthlyRatings'])->name('ratings.save_monthly');
+    Route::get('/invoices/get-students-by-group', [InvoicesController::class, 'getStudentsByGroup'])->name('invoices.getStudentsByGroup');
+
+    // في مجموعة الـ auth
+    // routes لحذف الكورس
+    Route::delete('/courses/{id}', [CourseController::class, 'destroy'])->name('delete_course');
+
+    // routes لحذف الساب كورس
+    Route::delete('/subcourses/{id}', [SubcourseController::class, 'destroy'])->name('delete_subcourse');
+    // Delete session route
+    // البحث في طلبات الحجز
+    Route::get('/bookings/search', [BookingController::class, 'search'])->name('bookings.search');
+
+    // Route لعرض نموذج نقل المجموعة
+    Route::get('/bookings/{bookingId}/transfer-group/{groupId}', [BookingController::class, 'showTransferForm'])
+        ->name('bookings.show-transfer-form');
+
+    // Route لعملية النقل
+    Route::post('/bookings/{bookingId}/transfer-group', [BookingController::class, 'transferToWaitingGroup'])
+        ->name('bookings.transfer-group');
+
+    // Route للبحث حسب حالة المجموعات (هذا موجود بالفعل في الكونترولر)
+    // يمكنك إضافة هذه إذا أردت routes منفصلة:
+    Route::get('/bookings/filter/in-groups', [BookingController::class, 'filterInGroups'])
+        ->name('bookings.filter.in-groups');
+
+    Route::get('/bookings/filter/not-in-groups', [BookingController::class, 'filterNotInGroups'])
+        ->name('bookings.filter.not-in-groups');
+    // Quizzes routes
+    Route::get('/quizzes/create', [\App\Http\Controllers\QuizzesController::class, 'create'])->name('quizzes.create');
+    Route::post('/quizzes', [\App\Http\Controllers\QuizzesController::class, 'store'])->name('quizzes.store');
+    Route::get('/quizzes/{quiz_id}', [\App\Http\Controllers\QuizzesController::class, 'show'])->name('quizzes.show');
+    Route::get('/quizzes/{quiz_id}/edit', [\App\Http\Controllers\QuizzesController::class, 'edit'])->name('quizzes.edit');
+    Route::put('/quizzes/{quiz_id}', [\App\Http\Controllers\QuizzesController::class, 'update'])->name('quizzes.update');
+    Route::post('/quizzes/{quiz_id}/questions', [\App\Http\Controllers\QuizzesController::class, 'storeQuestion'])->name('quizzes.questions.store');
+    Route::put('/quizzes/{quiz_id}/questions/{question_id}', [\App\Http\Controllers\QuizzesController::class, 'updateQuestion'])->name('quizzes.questions.update');
+    Route::delete('/quizzes/{quiz_id}/questions/{question_id}', [\App\Http\Controllers\QuizzesController::class, 'destroyQuestion'])->name('quizzes.questions.destroy');
+    // Student Reports Routes
+    // في routes/web.php
+    // داخل مجموعة auth
+    Route::prefix('api/students')->group(function () {
+        Route::get('/groups-financial-summary', [StudentReportController::class, 'getGroupsFinancialSummary']);
+        Route::get('/expired-groups-unpaid', [StudentReportController::class, 'getExpiredGroupsWithUnpaidInvoices']);
+        Route::get('/about-to-expire-unpaid', [StudentReportController::class, 'getAboutToExpireGroupsWithUnpaid']);
+        Route::get('/paid-students-no-active-groups', [StudentReportController::class, 'getPaidStudentsWithoutActiveGroups']);
+
+        // إضافة الروابط الأخرى التي تحتاجها
+        Route::get('/search', [StudentReportController::class, 'searchStudents'])->name('api.students.search');
+        Route::get('/{student}/report', [StudentReportController::class, 'studentReport'])->name('api.students.report');
+    });
+    // في routes/web.php
+    Route::get('/reports/students/financial/complete-data', [StudentReportController::class, 'getCompleteFinancialData'])
+        ->middleware(['auth', 'permission:view-reports'])
+        ->name('reports.students.financial.complete');
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}/mark-paid', [TeacherSalariesController::class, 'markAdjustmentPaid'])
+        ->name('teachers.adjustments.mark_paid');
+    // Routes للجروبات المالية
+    Route::get('/reports/groups-financial/dashboard', [StudentReportController::class, 'getGroupsFinancialDashboard']);
+    Route::get('/reports/groups-financial/unpaid-details/{groupId}', [StudentReportController::class, 'getGroupUnpaidDetails']);
+    Route::put('/teachers/{teacher}/adjustments/{adjustment}/mark-unpaid', [TeacherSalariesController::class, 'markAdjustmentUnpaid'])
+        ->name('teachers.adjustments.mark_unpaid');
+    // داخل مجموعة auth
+    Route::get('/reports/groups-financial-status', [StudentReportController::class, 'getGroupsFinancialReport'])
+        ->name('reports.groups-financial-status');
+    // داخل مجموعة auth
+    Route::prefix('reports/students/financial')->group(function () {
+        // تقرير الجروبات المنتهية مع فواتير غير مدفوعة
+        Route::get('/expired-groups-unpaid', [StudentReportController::class, 'getExpiredGroupsWithUnpaidInvoices'])
+            ->name('reports.students.financial.expired_groups_unpaid');
+
+        // تقرير الجروبات القريبة من الانتهاء مع فواتير غير مدفوعة
+        Route::get('/about-to-expire-unpaid', [StudentReportController::class, 'getAboutToExpireGroupsWithUnpaid'])
+            ->name('reports.students.financial.about_to_expire_unpaid');
+
+        // تقرير الطلاب الدافعين بدون جروبات نشطة
+        Route::get('/paid-students-no-active-groups', [StudentReportController::class, 'getPaidStudentsWithoutActiveGroups'])
+            ->name('reports.students.financial.paid_students_no_active_groups');
+    });
+    // تقارير الطلاب
+    // Routes للتقارير المالية
+    // Routes للتقارير المالية
+    Route::group(['middleware' => ['auth', 'can:view-reports']], function () {
+        Route::get('/reports/students/groups-financial/summary', [StudentReportController::class, 'getGroupsFinancialSummary']);
+        Route::get('/reports/students/groups-financial/details', [StudentReportController::class, 'getGroupsFinancialDetails']);
+        Route::get('/reports/students/groups-financial/expired', [StudentReportController::class, 'getAllExpiredGroups']);
+        Route::get('/reports/students/groups-financial/about-to-expire', [StudentReportController::class, 'getAllAboutToExpire']);
+        Route::get('/reports/students/groups-financial/paid-students', [StudentReportController::class, 'getAllPaidStudents']);
+
+        // Routes للتقارير التفاعلية
+        Route::post('/reports/groups/{groupId}/send-reminder', [StudentReportController::class, 'sendReminder']);
+        Route::post('/reports/students/{studentId}/promote', [StudentReportController::class, 'promoteCourse']);
+    });
+    // في routes/web.php أو routes/api.php
+    Route::get('/api/invoices/students-by-group', [App\Http\Controllers\InvoicesController::class, 'getStudentsByGroup']);
+    // تقارير الطلاب
+    Route::prefix('reports/students')->group(function () {
+        Route::get('/', [StudentReportController::class, 'index'])->name('reports.students.index');
+
+        // التقارير الرئيسية
+        Route::get('/daily-report', [StudentReportController::class, 'dailyReport'])->name('reports.students.daily');
+        Route::get('/weekly-report', [StudentReportController::class, 'weeklyReport'])->name('reports.students.weekly');
+        Route::get('/monthly-report', [StudentReportController::class, 'monthlyReport'])->name('reports.students.monthly');
+        Route::get('/annual-report', [StudentReportController::class, 'annualReport'])->name('reports.students.annual');
+        Route::get('/overall-report', [StudentReportController::class, 'overallReport'])->name('reports.students.overall');
+
+        // التقارير المالية
+        Route::get('/groups-financial-summary', [StudentReportController::class, 'getGroupsFinancialSummary'])->name('reports.students.financial.summary');
+        Route::get('/expired-groups-with-unpaid-invoices', [StudentReportController::class, 'getExpiredGroupsWithUnpaidInvoices'])->name('reports.students.financial.expired');
+        Route::get('/about-to-expire-groups-with-unpaid', [StudentReportController::class, 'getAboutToExpireGroupsWithUnpaid'])->name('reports.students.financial.about_to_expire');
+        Route::get('/paid-students-without-active-groups', [StudentReportController::class, 'getPaidStudentsWithoutActiveGroups'])->name('reports.students.financial.paid_students');
+
+        // تقارير الطالب المحدد
+        Route::get('/student/{studentId}/report', [StudentReportController::class, 'studentReport'])->name('reports.students.student');
+
+        // بحث الطلاب
+        Route::get('/search', [StudentReportController::class, 'searchStudents'])->name('reports.students.search');
+
+        // تصدير التقارير
+        Route::get('/export', [StudentReportController::class, 'exportReport'])->name('reports.students.export');
+        Route::get('/student/{studentId}/export', [StudentReportController::class, 'exportStudentReport'])->name('reports.students.export.student');
+    });
+    // Grade submission route
+    Route::post('/grade_submission', [AssignmentsController::class, 'gradeSubmission'])->name('assignments.grade_submission');
+
+    // Notifications route
+
+    // استبدال الـ route الحالي بهذا
+    Route::post('/mark_notifications_read', function () {
+        try {
+            $userId = auth()->id();
+
+            if (! $userId) {
+                return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+            }
+
+            $updated = DB::table('notifications')
+                ->where('user_id', $userId)
+                ->update(['is_read' => 1]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Notifications marked as read',
+                'updated_count' => $updated,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error marking notifications read: '.$e->getMessage());
+
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    })->name('notifications.markRead');
+
+    // User Import routes
+    Route::get('/users/import', [\App\Http\Controllers\UserImportController::class, 'showImportForm'])->name('users.import');
+    Route::post('/users/import', [\App\Http\Controllers\UserImportController::class, 'processImport'])->name('users.import.process');
+    Route::get('/users/import/download-sample', [\App\Http\Controllers\UserImportController::class, 'downloadSample'])->name('users.import.downloadSample');
+
+    // ... باقي routes
+    // Certificates
+    Route::get('/certificates', [CertificateController::class, 'index'])->name('certificates.index');
+    // Teacher: award badges and view badges they awarded
+    Route::get('/teacher/certificates', [CertificateController::class, 'teacherIndex'])->name('teacher.certificates.index');
+    Route::get('/teacher/certificates/create', [CertificateController::class, 'teacherCreate'])->name('teacher.certificates.create');
+    Route::post('/teacher/certificates/store', [CertificateController::class, 'teacherStore'])->name('teacher.certificates.store');
+    // Admin: issue/give certificate to any student or group
+    Route::get('/certificates/create-for', [CertificateController::class, 'createForAdmin'])->name('certificates.createForAdmin');
+    Route::post('/certificates/store-for', [CertificateController::class, 'storeForAdmin'])->name('certificates.storeForAdmin');
+    Route::get('/certificates/{certificate}/preview-design/{design}', [CertificateController::class, 'previewDesign'])->name('certificates.previewDesign');
+    Route::get('/certificate/{id}/download', [CertificateController::class, 'download'])->name('certificates.download');
+    // Allow generating group certificates by URL param or by POST body (group_id)
+    Route::post('/certificates/generate-group/{group?}', [CertificateController::class, 'generateGroup'])->name('certificates.generateGroup');
+    // certificate editor & finalize
+    Route::get('/certificates/{certificate}/edit', [CertificateController::class, 'edit'])->name('certificates.edit');
+    Route::post('/certificates/{certificate}/finalize', [CertificateController::class, 'finalize'])->name('certificates.finalize');
+
+    Route::post('/certificate-requests', [CertificateRequestController::class, 'store'])->name('certificate_requests.store');
+    Route::post('/certificate-requests/{certificateRequest}/approve', [CertificateRequestController::class, 'approve'])->name('certificate_requests.approve');
+    Route::get('/certificate-requests', [CertificateRequestController::class, 'index'])->name('certificate_requests.index');
+
+    Route::get('/certificate-templates', [CertificateTemplateController::class, 'index'])->name('certificate_templates.index');
+    Route::get('/certificate-templates/create', [CertificateTemplateController::class, 'create'])->name('certificate_templates.create');
+    Route::post('/certificate-templates', [CertificateTemplateController::class, 'store'])->name('certificate_templates.store');
+    Route::get('/certificate-templates/{id}/preview', [CertificateTemplateController::class, 'preview'])->name('certificates.template_preview');
+});
+
+Route::get('/help', function () {
+    return view('help');
+})->name('help');
+Route::get('/privacy-policy', function () {
+    return view('privacy');
+})->name('privacy-policy');
+
+Route::get('/terms', function () {
+    return view('terms');
+})->name('terms');

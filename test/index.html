@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Single Landing Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        
+        header, footer, section { padding: 20px; text-align: center; }
+        .container { max-width: 1200px; margin: auto; }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="logo">MySite Logo</div>
+            <ul class="nav-links">
+                <li><a href="#about">About Us</a></li>
+                <li><a href="#services">Services</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container">
+        <section id="about" class="landing-page-sections">
+            <h1>Welcome to MySite!</h1>
+            <p>Discover our world of solutions.</p>
+        </section>
+
+        <section id="services" class="landing-page-sections service-area">
+            <h2>Our Services</h2>
+            <ul class="service-list">
+                <li><button onclick="location.href='#about'">Learn More About Us</button></li>
+            </ul>
+        </section>
+
+        <section id="contact" class="landing-page-sections contact-area">
+            <h2>Get In Touch With Us</h2>
+            <!-- Form for email -->
+            <form action="#submitEmailForm" method="POST">
+                <div class="input-group mb-4">
+                    <label for="emailInput" class="form-label"></label>
+                    <input type="email" id="emailInput" name="email" placeholder="Enter your email" required autofocus/>
+                </div>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+        </section>
+
+        <footer class="site-footer footer-style">
+            <p>&copy; 2023 MySite. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Example JavaScript to show a welcome message when the page loads, using jQuery for simplicity
+        $(document).ready(function() {
+            alert('Welcome to MySite!');
+        });
+    </script>
+</body>
+</html>

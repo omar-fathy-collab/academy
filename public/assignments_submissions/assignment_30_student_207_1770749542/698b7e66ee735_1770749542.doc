@@ -1,0 +1,141 @@
+1) What is the role of the App component in React?
+
+The App component is usually the main root component of a React application.
+
+Think of it as the entry point of the UI.
+
+Its main responsibilities:
+
+Acts as the root container
+
+All other components are usually rendered inside it.
+
+It is mounted to the DOM in index.js using ReactDOM.createRoot().
+
+Controls the main layout
+
+Navigation bar
+
+Pages / routes
+
+Global sections like header, footer, sidebar
+
+Holds global state (sometimes)
+
+Authentication state
+
+Theme (dark/light mode)
+
+Global data shared between components
+
+Organizes the component tree
+
+Splits the UI into smaller reusable components.
+
+Example structure:
+
+function App() {
+  return (
+    <div>
+      <Navbar />
+      <HomePage />
+      <Footer />
+    </div>
+  );
+}
+
+
+So the App component is basically the main parent component that starts the whole interface.
+
+2) Why do we use a key when rendering a list?
+
+When React renders lists, it needs a way to identify each item uniquely.
+
+That’s where the key comes in.
+
+Example list rendering:
+
+const users = ["Ali", "Sara", "Omar"];
+
+function App() {
+  return (
+    <ul>
+      {users.map((user, index) => (
+        <li key={index}>{user}</li>
+      ))}
+    </ul>
+  );
+}
+
+Why keys are important
+
+React uses a process called Reconciliation (virtual DOM comparison).
+
+When the list changes (add / delete / reorder), React compares:
+
+Old list vs New list
+
+Without keys, React can’t know which item changed.
+
+With keys, React can:
+
+Update only the changed item
+
+Avoid re-rendering the whole list
+
+Improve performance
+
+Prevent UI bugs
+
+Example problem without keys
+
+Old list:
+
+[A, B, C]
+
+
+New list:
+
+[B, C, D]
+
+
+Without keys → React may think:
+
+A changed to B
+
+B changed to C
+
+C changed to D
+(re-render everything ❌)
+
+With keys → React knows:
+
+A removed ✔
+
+D added ✔
+
+B and C unchanged ✔
+
+Important rule
+
+Keys must be:
+
+Unique
+
+Stable (don’t change every render)
+
+Best key:
+
+key={user.id}   // from database
+
+
+Avoid:
+
+key={index} // only use if list never changes order
+
+
+Summary
+
+Concept	Purpose
+App Component	Root of the UI and component tree
+key prop	Helps React efficiently update lists and prevent bugs

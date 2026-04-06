@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue & Gold Certificate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-navy: 204 79% 20%;
+            --brand-gold: 46 66% 52%;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f7fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .certificate-container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .certificate-a4 {
+            width: 21cm;
+            height: 29.7cm;
+            background: white;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .certificate-border {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            right: 40px;
+            bottom: 40px;
+            border: 3px solid hsl(var(--brand-navy));
+            border-radius: 8px;
+            z-index: 1;
+        }
+
+        .certificate-inner-border {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            border: 2px solid hsl(var(--brand-gold));
+            border-radius: 4px;
+            z-index: 2;
+        }
+
+        .certificate-content {
+            position: relative;
+            z-index: 10;
+            padding: 70px 60px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .company-name {
+            font-size: 18px;
+            color: hsl(var(--brand-navy));
+            font-weight: 600;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+        }
+
+        .certificate-title {
+            font-family: 'Cinzel', serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: hsl(var(--brand-navy));
+            letter-spacing: 4px;
+            margin: 20px 0 10px;
+        }
+
+        .certificate-subtitle {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            color: hsl(var(--brand-gold));
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+
+        .presented-to {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .recipient-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 42px;
+            color: hsl(var(--brand-gold));
+            font-weight: 700;
+            margin: 20px 0;
+            padding: 10px 0;
+            border-top: 2px solid #eee;
+            border-bottom: 2px solid #eee;
+        }
+
+        .certificate-body {
+            text-align: center;
+            margin: 30px 0;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .certificate-text {
+            font-size: 18px;
+            line-height: 1.6;
+            color: #444;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .highlight {
+            color: hsl(var(--brand-navy));
+            font-weight: 600;
+        }
+
+        .recognition {
+            font-style: italic;
+            color: #666;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 50px;
+        }
+
+        .signature-box {
+            text-align: center;
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .signature-line {
+            width: 180px;
+            height: 1px;
+            background: #333;
+            margin: 60px auto 10px;
+        }
+
+        .signature-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: hsl(var(--brand-navy));
+        }
+
+        .signature-title {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .seal {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, white 0%, white 40%, transparent 41%),
+                        repeating-conic-gradient(hsl(var(--brand-gold)) 0deg 10deg, transparent 10deg 20deg);
+            border: 4px solid hsl(var(--brand-gold));
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .seal::after {
+            content: "";
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            border-radius: 50%;
+            background: hsl(var(--brand-navy));
+        }
+
+        .decoration {
+            position: absolute;
+            z-index: 0;
+        }
+
+        .corner-top-left {
+            top: 50px;
+            left: 50px;
+            width: 80px;
+            height: 80px;
+            border-top: 3px solid hsl(var(--brand-gold));
+            border-left: 3px solid hsl(var(--brand-gold));
+        }
+
+        .corner-top-right {
+            top: 50px;
+            right: 50px;
+            width: 80px;
+            height: 80px;
+            border-top: 3px solid hsl(var(--brand-gold));
+            border-right: 3px solid hsl(var(--brand-gold));
+        }
+
+        .corner-bottom-left {
+            bottom: 50px;
+            left: 50px;
+            width: 80px;
+            height: 80px;
+            border-bottom: 3px solid hsl(var(--brand-gold));
+            border-left: 3px solid hsl(var(--brand-gold));
+        }
+
+        .corner-bottom-right {
+            bottom: 50px;
+            right: 50px;
+            width: 80px;
+            height: 80px;
+            border-bottom: 3px solid hsl(var(--brand-gold));
+            border-right: 3px solid hsl(var(--brand-gold));
+        }
+
+        .gold-strip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: hsl(var(--brand-gold));
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: hsl(var(--brand-navy));
+            color: white;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: hsl(var(--brand-navy));
+            border: 2px solid hsl(var(--brand-navy));
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .certificate-a4 {
+                box-shadow: none;
+                margin: 0;
+                width: 21cm;
+                height: 29.7cm;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .controls {
+                display: none;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .certificate-a4 {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 21 / 29.7;
+            }
+            
+            .certificate-content {
+                padding: 40px 30px;
+            }
+            
+            .certificate-title {
+                font-size: 36px;
+            }
+            
+            .recipient-name {
+                font-size: 32px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate-container">
+        <div class="certificate-a4">
+            <div class="gold-strip"></div>
+            
+            <div class="certificate-border"></div>
+            <div class="certificate-inner-border"></div>
+            
+            <div class="decoration corner-top-left"></div>
+            <div class="decoration corner-top-right"></div>
+            <div class="decoration corner-bottom-left"></div>
+            <div class="decoration corner-bottom-right"></div>
+            
+            <div class="certificate-content">
+                <div class="header">
+                    <div class="company-name">INGOUDE COMPANY</div>
+                    <h1 class="certificate-title">CERTIFICATE</h1>
+                    <div class="certificate-subtitle">OF ACHIEVEMENT</div>
+                </div>
+                
+                <div class="certificate-body">
+                    <div class="presented-to">This certificate is presented to</div>
+                    <div class="recipient-name">Brigita Tsamara</div>
+                    
+                    <div class="certificate-text">
+                        for active participation as an attendee in the Weekly Teacher Training and Consolidation Seminar titled 
+                        <span class="highlight">"Understanding the Characteristics of Early Childhood"</span> 
+                        held on March 2, 2025.
+                    </div>
+                    
+                    <div class="recognition">
+                        In recognition of dedication to professional development and commitment to educational excellence.
+                    </div>
+                </div>
+                
+                <div class="signature-area">
+                    <div class="signature-box">
+                        <div class="seal"></div>
+                    </div>
+                    
+                    <div class="signature-box">
+                        <div class="signature-line"></div>
+                        <div class="signature-name">Pedro Fernandes</div>
+                        <div class="signature-title">CEO & Founder</div>
+                        <div class="signature-title">March 2, 2025</div>
+                    </div>
+                    
+                    <div class="signature-box">
+                        <div class="seal"></div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <p>Issued by Ingoude Company • Certificate ID: BG-CERT-2025-03842</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls no-print">
+            <button class="btn btn-secondary" onclick="window.open('https://c96730514d574e29b2edbbac394fe9c3-31e684d0086b4ffea64451bc4.projects.builder.codes', '_blank')">
+                <i class="fas fa-external-link-alt"></i> Live Preview
+            </button>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Print / Save as PDF
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Add a subtle animation when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const certificate = document.querySelector('.certificate-a4');
+            certificate.style.opacity = '0';
+            certificate.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                certificate.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
+                certificate.style.opacity = '1';
+                certificate.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
+</body>
+</html>

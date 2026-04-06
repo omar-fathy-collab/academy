@@ -1,0 +1,15 @@
+
+Warning: include(/Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/composer/../sebastian/version/src/Version.php): Failed to open stream: No such file or directory in /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/composer/ClassLoader.php on line 576
+
+Warning: include(): Failed opening '/Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/composer/../sebastian/version/src/Version.php' for inclusion (include_path='.:/usr/local/Cellar/php/8.5.2/share/php/pear') in /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/composer/ClassLoader.php on line 576
+
+Fatal error: Uncaught Error: Class "SebastianBergmann\Version" not found in /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/phpunit/phpunit/src/Runner/Version.php:38
+Stack trace:
+#0 /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/phpunit/phpunit/src/Runner/Version.php(49): PHPUnit\Runner\Version::id()
+#1 /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/nunomaduro/collision/src/Adapters/Phpunit/Autoload.php(10): PHPUnit\Runner\Version::series()
+#2 /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/composer/autoload_real.php(41): require('/Users/omartolb...')
+#3 /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/composer/autoload_real.php(45): {closure:ComposerAutoloaderInitc514d8f7b9fc5970bdd94287905ef584::getLoader():37}('a1cfe24d14977df...', '/Users/omartolb...')
+#4 /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/autoload.php(25): ComposerAutoloaderInitc514d8f7b9fc5970bdd94287905ef584::getLoader()
+#5 /Users/omartolba/Desktop/academmy backup/public_html/laravel/artisan(10): require('/Users/omartolb...')
+#6 {main}
+  thrown in /Users/omartolba/Desktop/academmy backup/public_html/laravel/vendor/phpunit/phpunit/src/Runner/Version.php on line 38

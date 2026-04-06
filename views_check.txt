@@ -1,0 +1,119 @@
+        if (!$student && !$user->isAdmin()) {
+            abort(403, 'Student profile not found.');
+        }
+
+        if (!$student && $user->isAdmin()) {
+            return view('student.dashboard', [
+                'student' => null,
+                'groups' => collect(),
+                'groupSessions' => [],
+                'groupAssignments' => [],
+                'notifications' => collect(),
+--
+                    }
+                }
+            }
+        }
+
+        return view('student.dashboard', [
+            'student' => $student,
+            'groups' => $groups,
+            'groupSessions' => $groupSessions,
+            'groupAssignments' => $groupAssignments,
+            'notifications' => $notifications,
+--
+        // Check for existing submission
+        $submission = AssignmentSubmission::where('assignment_id', $assignmentId)
+            ->where('student_id', $student->student_id)
+            ->first();
+
+        return view('student.assignments.submit', [
+            'assignment' => $assignment,
+            'submission' => $submission,
+            'student' => $student
+        ]);
+    }
+--
+            } else {
+                $assignment->status = 'Graded';
+            }
+        }
+
+        return view('student.assignments', [
+            'assignments' => $assignments
+        ]);
+    }
+
+    public function certificates()
+--
+        // Check for pending certificate request
+        $pendingRequest = \App\Models\CertificateRequest::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->first();
+
+        return view('student.certificates', [
+            'certificates' => $certificates,
+            'pendingRequest' => $pendingRequest,
+            'student' => $student
+        ]);
+    }
+--
+            ->where('id', $id)
+            ->where('user_id', $userId)
+            ->where('status', 'issued')
+            ->firstOrFail();
+
+        return view('certificates.view', compact('certificate'));
+    }
+
+    /**
+     * عرض جميع جلسات الطالب (الماضية والحالية والمستقبلية)
+     */
+--
+        $totalSessions = $allSessions->count();
+        $attendedSessions = $allSessions->filter(function ($item) {
+            return $item['attendance'] && $item['attendance']->status == 'present';
+        })->count();
+
+        return view('student.my_sessions', [
+            'student' => $student,
+            'groups' => $groups,
+            'upcomingSessions' => $upcomingSessions,
+            'pastSessions' => $pastSessions,
+            'totalSessions' => $totalSessions,
+--
+        $userId = Auth::id();
+        $student = Student::where('user_id', '=', $userId)->firstOrFail();
+
+        $groups = $student->groups()->with(['course', 'teacher'])->get();
+
+        return view('student.my_groups', [
+            'student' => $student,
+            'groups' => $groups
+        ]);
+    }
+
+--
+        $allMaterials = SessionMaterial::whereIn('session_id', $sessions->pluck('session_id'))
+            ->with('uploader')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('student.group_details', [
+            'student' => $student,
+            'group' => $group,
+            'sessions' => $sessions,
+            'allMaterials' => $allMaterials
+        ]);
+--
+                ->first();
+
+            $remainingAttempts = $quiz->max_attempts - $attemptsCount;
+        }
+
+        return view('student.session_details', [
+            'student' => $student,
+            'session' => $session,
+            'videos' => $videos,
+            'sessionDateTime' => $sessionDateTime->toIso8601String(),
+            'sessionEndDateTime' => $sessionEndDateTime->toIso8601String(),
